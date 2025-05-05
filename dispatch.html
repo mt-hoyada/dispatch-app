@@ -57,40 +57,49 @@
             margin-top: 10px;
         }
         .dispatch-list-row {
+            border-bottom: 1px solid #eee;
+            padding: 14px 0 10px 0;
+        }
+        .dispatch-list-row-main {
+            font-weight: bold;
+            font-size: 16px;
+            color: #222;
+            margin-bottom: 2px;
+            display: flex;
+            gap: 8px;
+        }
+        .dispatch-list-row-main .date {
+            min-width: 90px;
+            color: #388e3c;
+        }
+        .dispatch-list-row-sub {
+            font-size: 15px;
+            color: #444;
+            margin-bottom: 2px;
+            word-break: break-all;
+        }
+        .dispatch-list-row-bottom {
             display: flex;
             align-items: center;
-            border-bottom: 1px solid #eee;
-            padding: 10px 0;
+            gap: 10px;
             font-size: 15px;
         }
-        .dispatch-list-row > div {
-            flex: 1 1 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            padding-right: 6px;
+        .dispatch-list-row-bottom .car-number {
+            color: #555;
         }
-        .dispatch-list-header {
-            display: flex;
-            font-weight: bold;
-            background: #f0f0f0;
-            border-radius: 4px;
-            padding: 8px 0;
-            font-size: 15px;
-        }
-        .dispatch-list-header > div {
-            flex: 1 1 0;
-            padding-right: 6px;
+        .dispatch-list-row-bottom .cargo {
+            color: #888;
         }
         .copy-btn {
             background: #4CAF50;
             color: white;
             border: none;
-            padding: 7px 12px;
+            padding: 7px 14px;
             cursor: pointer;
             border-radius: 4px;
             font-size: 15px;
             min-width: 48px;
+            margin-left: auto;
         }
         .copy-btn:hover {
             background: #388e3c;
@@ -174,30 +183,26 @@
         // 최초 로딩 시 오늘 하루 데이터 표시
         fetchDispatchDataByRange();
 
-        // 배차 목록 렌더링 (리스트형)
+        // 배차 목록 렌더링 (모바일 가독성 리스트형)
         function renderDispatchList(dispatchData) {
             const list = document.getElementById('dispatchList');
             if (dispatchData.length === 0) {
                 list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">데이터가 없습니다.</div>';
                 return;
             }
-            let html = `<div class="dispatch-list">
-                <div class="dispatch-list-header">
-                    <div>날짜</div>
-                    <div>거래처</div>
-                    <div>운행구간</div>
-                    <div>차량번호</div>
-                    <div>차종</div>
-                    <div></div>
-                </div>`;
+            let html = `<div class="dispatch-list">`;
             html += dispatchData.map(item => `
                 <div class="dispatch-list-row">
-                    <div>${item.date || ''}</div>
-                    <div>${item.company || ''}</div>
-                    <div>${item.route || ''}</div>
-                    <div>${item.carNumber || ''}</div>
-                    <div>${item.cargo || ''}</div>
-                    <div><button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}')">복사</button></div>
+                    <div class="dispatch-list-row-main">
+                        <span class="date">${item.date || ''}</span>
+                        <span>${item.company || ''}</span>
+                    </div>
+                    <div class="dispatch-list-row-sub">${item.route || ''}</div>
+                    <div class="dispatch-list-row-bottom">
+                        <span class="car-number">${item.carNumber || ''}</span>
+                        <span class="cargo">${item.cargo || ''}</span>
+                        <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}')">복사</button>
+                    </div>
                 </div>
             `).join('');
             html += '</div>';
