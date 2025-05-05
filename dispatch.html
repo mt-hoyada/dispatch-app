@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>배차 목록</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Firebase SDK 추가 -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .date-picker {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            height: 44px;
+        }
+        .dispatch-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .dispatch-item p {
+            margin: 5px 0;
+        }
+        .copy-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .copy-btn:hover {
+            background: #45a049;
+        }
+        .phone-link {
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .phone-link:hover {
+            text-decoration: underline;
+        }
+        .search-btn {
+            min-width: 70px;
+            height: 44px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-left: 10px;
+            background: #43a047;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(67,160,71,0.08);
+            transition: background 0.2s;
+        }
+        .search-btn:hover {
+            background: #388e3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>배차 목록</h1>
+        <div style="display:flex; gap:10px; margin-bottom:20px; align-items:center;">
+            <input type="date" id="startDate" class="date-picker" value="">
+            <span style="font-size:18px;">~</span>
+            <input type="date" id="endDate" class="date-picker" value="">
+            <button id="searchBtn" class="copy-btn search-btn">조회</button>
+        </div>
+        <div id="dispatchList"></div>
+    </div>
+
+    <script>
+        // Firebase 초기화
+        const firebaseConfig = {
+  apiKey: "AIzaSyD6S2dILlwKETij2-X6jlRWasZwIzmvdp8",
+  authDomain: "sw-it-v01.firebaseapp.com",
+  databaseURL: "https://sw-it-v01-default-rtdb.firebaseio.com",
+  projectId: "sw-it-v01",
+  storageBucket: "sw-it-v01.firebasestorage.app",
+  messagingSenderId: "1000586137880",
+  appId: "1:1000586137880:web:7984aaae42070bb5dc0e6d",
+  measurementId: "G-Y5R0S9SGPD"
+};
+
+        // Firebase 초기화
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // 오늘 날짜 기본값
+        function getTodayStr() {
+            const today = new Date();
+            return today.toISOString().slice(0, 10);
+        }
+        document.getElementById('startDate').value = getTodayStr();
+        document.getElementById('endDate').value = getTodayStr();
+
+        // 기간 데이터 불러오기
+        async function fetchDispatchDataByRange() {
+            let startDate = document.getElementById('startDate').value.trim();
+            let endDate = document.getElementById('endDate').value.trim();
+            if (!startDate || !endDate) {
+                alert('시작일과 종료일을 모두 선택하세요.');
+                return;
+            }
+            if (startDate > endDate) {
+                alert('시작일이 종료일보다 늦을 수 없습니다.');
+                return;
+            }
+            try {
+                console.log("기간 조회:", startDate, '~', endDate);
+                const snapshot = await db.collection("배차일보")
+                    .where("date", ">=", startDate)
+                    .where("date", "<=", endDate)
+                    .get();
+                console.log("기간 데이터 가져오기 성공:", snapshot.docs.length, "개 문서");
+                const dispatchData = snapshot.docs.map(doc => doc.data());
+                renderDispatchList(dispatchData);
+            } catch (error) {
+                console.error("기간 데이터 가져오기 실패:", error);
+                alert("데이터를 가져오는데 실패했습니다: " + error.message);
+            }
+        }
+
+        // 조회 버튼 이벤트
+        document.getElementById('searchBtn').addEventListener('click', fetchDispatchDataByRange);
+
+        // 최초 로딩 시 오늘 하루 데이터 표시
+        fetchDispatchDataByRange();
+
+        // 배차 목록 렌더링 (테이블 형태)
+        function renderDispatchList(dispatchData) {
+            const list = document.getElementById('dispatchList');
+            if (dispatchData.length === 0) {
+                list.innerHTML = '<div class="dispatch-item">데이터가 없습니다.</div>';
+                return;
+            }
+            // 테이블 헤더
+            let html = `<table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f0f0f0;">
+                        <th style="border:1px solid #ddd; padding:8px;">날짜</th>
+                        <th style="border:1px solid #ddd; padding:8px;">거래처상호</th>
+                        <th style="border:1px solid #ddd; padding:8px;">운행구간</th>
+                        <th style="border:1px solid #ddd; padding:8px;">차종</th>
+                        <th style="border:1px solid #ddd; padding:8px;">운송비</th>
+                        <th style="border:1px solid #ddd; padding:8px;">연락처</th>
+                        <th style="border:1px solid #ddd; padding:8px;">이름</th>
+                        <th style="border:1px solid #ddd; padding:8px;">복사</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            html += dispatchData.map(item => `
+                <tr>
+                    <td style="border:1px solid #ddd; padding:8px;">${item.date || ''}</td>
+                    <td style="border:1px solid #ddd; padding:8px;">${item.company || ''}</td>
+                    <td style="border:1px solid #ddd; padding:8px;">${item.route || ''}</td>
+                    <td style="border:1px solid #ddd; padding:8px;">${item.cargo || ''}</td>
+                    <td style="border:1px solid #ddd; padding:8px; text-align:right;">${item.paymentAmount ? item.paymentAmount.toLocaleString() : ''}</td>
+                    <td style="border:1px solid #ddd; padding:8px;"><a href="tel:${item.contact || ''}" class="phone-link">${item.contact || ''}</a></td>
+                    <td style="border:1px solid #ddd; padding:8px;">${item.driverName || ''}</td>
+                    <td style="border:1px solid #ddd; padding:8px; text-align:center;">
+                        <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}')">복사</button>
+                    </td>
+                </tr>
+            `).join('');
+            html += '</tbody></table>';
+            list.innerHTML = html;
+        }
+
+        // 복사 기능 (5개 항목 줄바꿈)
+        function copyInfo(company, date, route, contact, driverName) {
+            const text = `거래처상호: ${company}\n날짜: ${date}\n운행구간: ${route}\n연락처: ${contact}\n이름: ${driverName}`;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('복사되었습니다!');
+            });
+        }
+    </script>
+</body>
+</html>
