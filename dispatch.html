@@ -35,15 +35,16 @@
             font-size: 16px;
             height: 44px;
         }
-        .dispatch-item {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-            background-color: white;
+        .dispatch-table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        .dispatch-item p {
-            margin: 5px 0;
+        .dispatch-table th, .dispatch-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .dispatch-table th {
+            background: #f0f0f0;
         }
         .copy-btn {
             background: #4CAF50;
@@ -77,6 +78,40 @@
         }
         .search-btn:hover {
             background: #388e3c;
+        }
+        /* 모바일 카드형 스타일 */
+        @media (max-width: 700px) {
+            .dispatch-table { display: none; }
+            .dispatch-card-list { display: block; }
+        }
+        @media (min-width: 701px) {
+            .dispatch-card-list { display: none; }
+        }
+        .dispatch-card-list {
+            display: none;
+            margin-top: 10px;
+        }
+        .dispatch-card {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            padding: 15px 15px 10px 15px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .dispatch-card-row {
+            margin-bottom: 6px;
+            font-size: 16px;
+        }
+        .dispatch-card-label {
+            font-weight: bold;
+            color: #333;
+            margin-right: 6px;
+        }
+        .dispatch-card .copy-btn {
+            width: 100%;
+            margin-top: 10px;
+            font-size: 16px;
         }
     </style>
 </head>
@@ -150,44 +185,61 @@
         // 최초 로딩 시 오늘 하루 데이터 표시
         fetchDispatchDataByRange();
 
-        // 배차 목록 렌더링 (테이블 형태)
+        // 배차 목록 렌더링 (반응형: PC-테이블, 모바일-카드)
         function renderDispatchList(dispatchData) {
             const list = document.getElementById('dispatchList');
             if (dispatchData.length === 0) {
                 list.innerHTML = '<div class="dispatch-item">데이터가 없습니다.</div>';
                 return;
             }
-            // 테이블 헤더
-            let html = `<table style="width:100%; border-collapse:collapse;">
+            // PC: 테이블
+            let tableHtml = `<table class="dispatch-table">
                 <thead>
-                    <tr style="background:#f0f0f0;">
-                        <th style="border:1px solid #ddd; padding:8px;">날짜</th>
-                        <th style="border:1px solid #ddd; padding:8px;">거래처상호</th>
-                        <th style="border:1px solid #ddd; padding:8px;">운행구간</th>
-                        <th style="border:1px solid #ddd; padding:8px;">차종</th>
-                        <th style="border:1px solid #ddd; padding:8px;">운송비</th>
-                        <th style="border:1px solid #ddd; padding:8px;">연락처</th>
-                        <th style="border:1px solid #ddd; padding:8px;">이름</th>
-                        <th style="border:1px solid #ddd; padding:8px;">복사</th>
+                    <tr>
+                        <th>날짜</th>
+                        <th>거래처상호</th>
+                        <th>운행구간</th>
+                        <th>차종</th>
+                        <th>운송비</th>
+                        <th>연락처</th>
+                        <th>이름</th>
+                        <th>복사</th>
                     </tr>
                 </thead>
                 <tbody>`;
-            html += dispatchData.map(item => `
+            tableHtml += dispatchData.map(item => `
                 <tr>
-                    <td style="border:1px solid #ddd; padding:8px;">${item.date || ''}</td>
-                    <td style="border:1px solid #ddd; padding:8px;">${item.company || ''}</td>
-                    <td style="border:1px solid #ddd; padding:8px;">${item.route || ''}</td>
-                    <td style="border:1px solid #ddd; padding:8px;">${item.cargo || ''}</td>
-                    <td style="border:1px solid #ddd; padding:8px; text-align:right;">${item.paymentAmount ? item.paymentAmount.toLocaleString() : ''}</td>
-                    <td style="border:1px solid #ddd; padding:8px;"><a href="tel:${item.contact || ''}" class="phone-link">${item.contact || ''}</a></td>
-                    <td style="border:1px solid #ddd; padding:8px;">${item.driverName || ''}</td>
-                    <td style="border:1px solid #ddd; padding:8px; text-align:center;">
+                    <td>${item.date || ''}</td>
+                    <td>${item.company || ''}</td>
+                    <td>${item.route || ''}</td>
+                    <td>${item.cargo || ''}</td>
+                    <td style="text-align:right;">${item.paymentAmount ? item.paymentAmount.toLocaleString() : ''}</td>
+                    <td><a href="tel:${item.contact || ''}" class="phone-link">${item.contact || ''}</a></td>
+                    <td>${item.driverName || ''}</td>
+                    <td style="text-align:center;">
                         <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}')">복사</button>
                     </td>
                 </tr>
             `).join('');
-            html += '</tbody></table>';
-            list.innerHTML = html;
+            tableHtml += '</tbody></table>';
+
+            // 모바일: 카드형 리스트
+            let cardHtml = `<div class="dispatch-card-list">`;
+            cardHtml += dispatchData.map(item => `
+                <div class="dispatch-card">
+                    <div class="dispatch-card-row"><span class="dispatch-card-label">날짜</span>${item.date || ''}</div>
+                    <div class="dispatch-card-row"><span class="dispatch-card-label">거래처상호</span>${item.company || ''}</div>
+                    <div class="dispatch-card-row"><span class="dispatch-card-label">운행구간</span>${item.route || ''}</div>
+                    <div class="dispatch-card-row"><span class="dispatch-card-label">차종</span>${item.cargo || ''}</div>
+                    <div class="dispatch-card-row"><span class="dispatch-card-label">운송비</span>${item.paymentAmount ? item.paymentAmount.toLocaleString() : ''}</div>
+                    <div class="dispatch-card-row"><span class="dispatch-card-label">연락처</span><a href="tel:${item.contact || ''}" class="phone-link">${item.contact || ''}</a></div>
+                    <div class="dispatch-card-row"><span class="dispatch-card-label">이름</span>${item.driverName || ''}</div>
+                    <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}')">복사</button>
+                </div>
+            `).join('');
+            cardHtml += '</div>';
+
+            list.innerHTML = tableHtml + cardHtml;
         }
 
         // 복사 기능 (5개 항목 줄바꿈)
