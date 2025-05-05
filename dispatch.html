@@ -59,6 +59,11 @@
         .dispatch-list-row {
             border-bottom: 1px solid #eee;
             padding: 14px 0 10px 0;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .dispatch-list-row:hover {
+            background: #f5f5f5;
         }
         .dispatch-list-row-main {
             font-weight: bold;
@@ -104,12 +109,63 @@
         .copy-btn:hover {
             background: #388e3c;
         }
+        .copy-btn:active {
+            background: #2e7d32;
+        }
         .phone-link {
             color: #2196F3;
             text-decoration: none;
         }
         .phone-link:hover {
             text-decoration: underline;
+        }
+        /* 모달 스타일 */
+        .modal-bg {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-box {
+            background: #fff;
+            border-radius: 10px;
+            max-width: 90vw;
+            width: 350px;
+            padding: 24px 18px 18px 18px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            position: relative;
+        }
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        .modal-row {
+            margin-bottom: 8px;
+            font-size: 16px;
+            display: flex;
+        }
+        .modal-label {
+            min-width: 90px;
+            color: #388e3c;
+            font-weight: bold;
+        }
+        .modal-value {
+            color: #222;
+            word-break: break-all;
+        }
+        .modal-close {
+            position: absolute;
+            top: 10px; right: 14px;
+            font-size: 22px;
+            color: #888;
+            background: none;
+            border: none;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -123,6 +179,7 @@
         </div>
         <button id="searchBtn" class="search-btn">조회</button>
         <div id="dispatchList"></div>
+        <div id="modalBg" style="display:none;"></div>
     </div>
 
     <script>
@@ -191,23 +248,26 @@
                 return;
             }
             let html = `<div class="dispatch-list">`;
-            html += dispatchData.map(item => `
-                <div class="dispatch-list-row">
+            html += dispatchData.map((item, idx) => `
+                <div class="dispatch-list-row" onclick="showDetailModal(${idx})">
                     <div class="dispatch-list-row-main">
                         <span class="date">${item.date || ''}</span>
                         <span>${item.company || ''}</span>
                     </div>
                     <div class="dispatch-list-row-sub">${item.route || ''}</div>
-                    <div class="dispatch-list-row-bottom">
+                    <div class="dispatch-list-row-bottom" onclick="event.stopPropagation();">
                         <span class="car-number">${item.vehicleNumber || item.carNumber || item['차량번호'] || ''}</span>
                         <span class="cargo">${item.cargo || ''}</span>
                         <a href="tel:${item.contact || ''}" class="phone-link" style="margin-right:8px;">${item.contact || ''}</a>
-                        <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}')">복사</button>
+                        <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}'); event.stopPropagation();">복사</button>
                     </div>
                 </div>
             `).join('');
             html += '</div>';
             list.innerHTML = html;
+
+            // 상세 데이터 전역 저장
+            window._dispatchData = dispatchData;
         }
 
         // 복사 기능 (5개 항목 줄바꿈)
@@ -216,6 +276,33 @@
             navigator.clipboard.writeText(text).then(() => {
                 alert('복사되었습니다!');
             });
+        }
+
+        // 상세 모달 표시 함수
+        function showDetailModal(idx) {
+            const data = window._dispatchData[idx];
+            const modalBg = document.getElementById('modalBg');
+            modalBg.innerHTML = `
+                <div class="modal-bg" onclick="closeModal()">
+                    <div class="modal-box" onclick="event.stopPropagation();">
+                        <button class="modal-close" onclick="closeModal()">&times;</button>
+                        <div class="modal-title">배차 상세 내역</div>
+                        <div class="modal-row"><span class="modal-label">거래처상호</span><span class="modal-value">${data.company || ''}</span></div>
+                        <div class="modal-row"><span class="modal-label">날짜</span><span class="modal-value">${data.date || ''}</span></div>
+                        <div class="modal-row"><span class="modal-label">차량번호</span><span class="modal-value">${data.vehicleNumber || data.carNumber || data['차량번호'] || ''}</span></div>
+                        <div class="modal-row"><span class="modal-label">운행구간</span><span class="modal-value">${data.route || ''}</span></div>
+                        <div class="modal-row"><span class="modal-label">차종</span><span class="modal-value">${data.cargo || ''}</span></div>
+                        <div class="modal-row"><span class="modal-label">청구운송비</span><span class="modal-value">${data.billingAmount ? data.billingAmount.toLocaleString() : ''}</span></div>
+                        <div class="modal-row"><span class="modal-label">지급운송비</span><span class="modal-value">${data.paymentAmount ? data.paymentAmount.toLocaleString() : ''}</span></div>
+                        <div class="modal-row"><span class="modal-label">연락처</span><span class="modal-value"><a href="tel:${data.contact || ''}" class="phone-link">${data.contact || ''}</a></span></div>
+                        <div class="modal-row"><span class="modal-label">이름</span><span class="modal-value">${data.driverName || ''}</span></div>
+                    </div>
+                </div>
+            `;
+            modalBg.style.display = '';
+        }
+        function closeModal() {
+            document.getElementById('modalBg').style.display = 'none';
         }
     </script>
 </body>
