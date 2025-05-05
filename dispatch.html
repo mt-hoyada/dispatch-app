@@ -199,8 +199,9 @@
                     </div>
                     <div class="dispatch-list-row-sub">${item.route || ''}</div>
                     <div class="dispatch-list-row-bottom">
-                        <span class="car-number">${item.carNumber || item.vehicleNumber || item['차량번호'] || ''}</span>
+                        <span class="car-number">${item.vehicleNumber || item.carNumber || item['차량번호'] || ''}</span>
                         <span class="cargo">${item.cargo || ''}</span>
+                        <a href="tel:${item.contact || ''}" class="phone-link" style="margin-right:8px;">${item.contact || ''}</a>
                         <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}')">복사</button>
                     </div>
                 </div>
