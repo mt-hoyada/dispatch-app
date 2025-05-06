@@ -61,9 +61,22 @@
             padding: 14px 0 10px 0;
             cursor: pointer;
             transition: background 0.15s;
+            display: flex;
+            align-items: flex-start;
         }
         .dispatch-list-row:hover {
             background: #f5f5f5;
+        }
+        .dispatch-list-row-content {
+            flex: 1;
+        }
+        .dispatch-list-row-checkbox {
+            margin-right: 10px;
+            margin-top: 4px;
+        }
+        .dispatch-list-row-checkbox input {
+            width: 18px;
+            height: 18px;
         }
         .dispatch-list-row-main {
             font-weight: bold;
@@ -167,6 +180,26 @@
             border: none;
             cursor: pointer;
         }
+        .multi-copy-btn {
+            width: 90vw;
+            max-width: 500px;
+            height: 48px;
+            font-size: 18px;
+            font-weight: bold;
+            background: #2196F3;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(33,150,243,0.15);
+            transition: background 0.2s;
+            position: fixed;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            z-index: 2000;
+            display: none;
+        }
+        .multi-copy-btn:hover {
+            background: #1976D2;
+        }
     </style>
 </head>
 <body>
@@ -180,6 +213,7 @@
         <button id="searchBtn" class="search-btn">조회</button>
         <div id="dispatchList"></div>
         <div id="modalBg" style="display:none;"></div>
+        <button id="multiCopyBtn" class="multi-copy-btn" style="display:none;">다중 복사</button>
     </div>
 
     <script>
@@ -204,8 +238,24 @@
             const today = new Date();
             return today.toISOString().slice(0, 10);
         }
-        document.getElementById('startDate').value = getTodayStr();
-        document.getElementById('endDate').value = getTodayStr();
+
+        // 날짜 입력란 및 체크박스 상태 복원
+        function restoreState() {
+            // 날짜 복원
+            const savedStart = localStorage.getItem('dispatch_startDate');
+            const savedEnd = localStorage.getItem('dispatch_endDate');
+            document.getElementById('startDate').value = savedStart || getTodayStr();
+            document.getElementById('endDate').value = savedEnd || getTodayStr();
+        }
+        restoreState();
+
+        // 날짜 변경 시 localStorage에 저장
+        document.getElementById('startDate').addEventListener('change', function(e) {
+            localStorage.setItem('dispatch_startDate', e.target.value);
+        });
+        document.getElementById('endDate').addEventListener('change', function(e) {
+            localStorage.setItem('dispatch_endDate', e.target.value);
+        });
 
         // 기간 데이터 불러오기
         async function fetchDispatchDataByRange() {
@@ -228,6 +278,7 @@
                 console.log("기간 데이터 가져오기 성공:", snapshot.docs.length, "개 문서");
                 const dispatchData = snapshot.docs.map(doc => doc.data());
                 renderDispatchList(dispatchData);
+                restoreCheckboxState();
             } catch (error) {
                 console.error("기간 데이터 가져오기 실패:", error);
                 alert("데이터를 가져오는데 실패했습니다: " + error.message);
@@ -237,8 +288,24 @@
         // 조회 버튼 이벤트
         document.getElementById('searchBtn').addEventListener('click', fetchDispatchDataByRange);
 
-        // 최초 로딩 시 오늘 하루 데이터 표시
+        // 최초 로딩 시 오늘 하루 데이터 표시 (또는 저장된 날짜)
         fetchDispatchDataByRange();
+
+        // 체크박스 상태 저장/복원
+        function saveCheckboxState() {
+            const checked = Array.from(document.querySelectorAll('input[type="checkbox"][id^="check_"]'))
+                .filter(box => box.checked)
+                .map(box => box.id);
+            localStorage.setItem('dispatch_checked', JSON.stringify(checked));
+        }
+        function restoreCheckboxState() {
+            const checked = JSON.parse(localStorage.getItem('dispatch_checked') || '[]');
+            checked.forEach(id => {
+                const box = document.getElementById(id);
+                if (box) box.checked = true;
+            });
+            updateMultiCopyBtn();
+        }
 
         // 배차 목록 렌더링 (모바일 가독성 리스트형)
         function renderDispatchList(dispatchData) {
@@ -250,16 +317,21 @@
             let html = `<div class="dispatch-list">`;
             html += dispatchData.map((item, idx) => `
                 <div class="dispatch-list-row" onclick="showDetailModal(${idx})">
-                    <div class="dispatch-list-row-main">
-                        <span class="date">${item.date || ''}</span>
-                        <span>${item.company || ''}</span>
+                    <div class="dispatch-list-row-checkbox" onclick="event.stopPropagation();">
+                        <input type="checkbox" id="check_${idx}" onchange="updateMultiCopyBtn(); saveCheckboxState();">
                     </div>
-                    <div class="dispatch-list-row-sub">${item.route || ''}</div>
-                    <div class="dispatch-list-row-bottom" onclick="event.stopPropagation();">
-                        <span class="car-number">${item.vehicleNumber || item.carNumber || item['차량번호'] || ''}</span>
-                        <span class="cargo">${item.cargo || ''}</span>
-                        <a href="tel:${item.contact || ''}" class="phone-link" style="margin-right:8px;">${item.contact || ''}</a>
-                        <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}'); event.stopPropagation();">복사</button>
+                    <div class="dispatch-list-row-content">
+                        <div class="dispatch-list-row-main">
+                            <span class="date">${item.date || ''}</span>
+                            <span>${item.company || ''}</span>
+                        </div>
+                        <div class="dispatch-list-row-sub">${item.route || ''}</div>
+                        <div class="dispatch-list-row-bottom" onclick="event.stopPropagation();">
+                            <span class="car-number">${item.vehicleNumber || item.carNumber || item['차량번호'] || ''}</span>
+                            <span class="cargo">${item.cargo || ''}</span>
+                            <a href="tel:${item.contact || ''}" class="phone-link" style="margin-right:8px;">${item.contact || ''}</a>
+                            <button class="copy-btn" onclick="copyInfo('${item.company || ''}', '${item.date || ''}', '${item.route || ''}', '${item.contact || ''}', '${item.driverName || ''}'); event.stopPropagation();">복사</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -268,6 +340,8 @@
 
             // 상세 데이터 전역 저장
             window._dispatchData = dispatchData;
+            updateMultiCopyBtn();
+            restoreCheckboxState();
         }
 
         // 복사 기능 (5개 항목 줄바꿈)
@@ -277,6 +351,40 @@
                 alert('복사되었습니다!');
             });
         }
+
+        // 다중 선택 복사 기능
+        function updateMultiCopyBtn() {
+            const checkedBoxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            const multiCopyBtn = document.getElementById('multiCopyBtn');
+            if (checkedBoxes.length > 0) {
+                multiCopyBtn.style.display = 'block';
+            } else {
+                multiCopyBtn.style.display = 'none';
+            }
+        }
+
+        function multiCopy() {
+            const checkedBoxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkedBoxes.length === 0) {
+                alert('복사할 항목을 선택하세요.');
+                return;
+            }
+            let text = '';
+            checkedBoxes.forEach((box, index) => {
+                const itemIdx = box.id.split('_')[1];
+                const data = window._dispatchData[itemIdx];
+                text += `거래처상호: ${data.company || ''}\n날짜: ${data.date || ''}\n운행구간: ${data.route || ''}\n연락처: ${data.contact || ''}\n이름: ${data.driverName || ''}`;
+                if (index < checkedBoxes.length - 1) {
+                    text += '\n\n---\n\n';
+                }
+            });
+            navigator.clipboard.writeText(text).then(() => {
+                alert('선택한 항목이 복사되었습니다!');
+            });
+        }
+
+        // 다중 선택 복사 버튼 이벤트
+        document.getElementById('multiCopyBtn').addEventListener('click', multiCopy);
 
         // 상세 모달 표시 함수
         function showDetailModal(idx) {
