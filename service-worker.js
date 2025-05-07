@@ -1,7 +1,9 @@
 const CACHE_NAME = 'dispatch-app-v1';
 const urlsToCache = [
-  '/배차앱/dispatch.html',
-  '/배차앱/manifest.json',
+  '/dispatch-app/dispatch.html',
+  '/dispatch-app/manifest.json',
+  '/dispatch-app/icon-192x192.png',
+  '/dispatch-app/icon-512x512.png',
   'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js'

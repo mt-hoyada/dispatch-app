@@ -3,6 +3,10 @@
 <head>
     <title>배차 목록</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#43a047">
+    <meta name="description" content="배차 관리 및 조회 앱">
+    <link rel="manifest" href="/dispatch-app/manifest.json">
+    <link rel="apple-touch-icon" href="/dispatch-app/icon-192x192.png">
     <!-- Firebase SDK 추가 -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -222,6 +226,19 @@
     </div>
 
     <script>
+        // Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/배차앱/service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful');
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+
         // Firebase 초기화
         const firebaseConfig = {
   apiKey: "AIzaSyD6S2dILlwKETij2-X6jlRWasZwIzmvdp8",
@@ -385,6 +402,10 @@
             });
             navigator.clipboard.writeText(text).then(() => {
                 alert('선택한 항목이 복사되었습니다!');
+                // 체크박스 해제 및 localStorage 초기화
+                checkedBoxes.forEach(box => { box.checked = false; });
+                localStorage.removeItem('dispatch_checked');
+                updateMultiCopyBtn();
             });
         }
 
