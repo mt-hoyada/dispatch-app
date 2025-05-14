@@ -57,6 +57,25 @@
         .search-btn:hover {
             background: #388e3c;
         }
+        .sort-options {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            justify-content: center;
+        }
+        .sort-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f0f0f0;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .sort-btn.active {
+            background: #43a047;
+            color: white;
+            border-color: #43a047;
+        }
         .dispatch-list {
             margin-top: 10px;
         }
@@ -220,6 +239,13 @@
             <input type="date" id="endDate" class="date-picker" value="">
         </div>
         <button id="searchBtn" class="search-btn">조회</button>
+        
+        <div class="sort-options">
+            <button class="sort-btn active" data-sort="dateAsc">날짜 오름차순</button>
+            <button class="sort-btn" data-sort="dateDesc">날짜 내림차순</button>
+            <button class="sort-btn" data-sort="company">거래처상호</button>
+        </div>
+        
         <div id="dispatchList"></div>
         <div id="modalBg" style="display:none;"></div>
         <button id="multiCopyBtn" class="multi-copy-btn" style="display:none;">다중 복사</button>
@@ -255,6 +281,9 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // 현재 정렬 방식 저장
+        let currentSortMethod = 'dateAsc';
+
         // 오늘 날짜 기본값
         function getTodayStr() {
             const today = new Date();
@@ -268,6 +297,15 @@
             const savedEnd = localStorage.getItem('dispatch_endDate');
             document.getElementById('startDate').value = savedStart || getTodayStr();
             document.getElementById('endDate').value = savedEnd || getTodayStr();
+            
+            // 정렬 방식 복원
+            const savedSortMethod = localStorage.getItem('dispatch_sortMethod') || 'dateAsc';
+            currentSortMethod = savedSortMethod;
+            
+            // 정렬 버튼 상태 업데이트
+            document.querySelectorAll('.sort-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.sort === currentSortMethod);
+            });
         }
         restoreState();
 
@@ -278,6 +316,64 @@
         document.getElementById('endDate').addEventListener('change', function(e) {
             localStorage.setItem('dispatch_endDate', e.target.value);
         });
+
+        // 정렬 방식 버튼 이벤트
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // 현재 버튼만 활성화
+                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // 정렬 방식 업데이트
+                currentSortMethod = this.dataset.sort;
+                localStorage.setItem('dispatch_sortMethod', currentSortMethod);
+                
+                // 이미 데이터가 있으면 재정렬하여 표시
+                if (window._dispatchData && window._dispatchData.length > 0) {
+                    sortAndRenderDispatchData(window._dispatchData);
+                }
+            });
+        });
+
+        // 데이터 정렬 함수
+        function sortAndRenderDispatchData(data) {
+            if (!data || !data.length) return;
+            
+            const sortedData = [...data]; // 원본 데이터 복사
+            
+            // 정렬 방식에 따라 정렬
+            switch (currentSortMethod) {
+                case 'dateAsc': // 날짜 오름차순 (기본값)
+                    sortedData.sort((a, b) => {
+                        if (a.date !== b.date) {
+                            return a.date < b.date ? -1 : 1;
+                        }
+                        return (a.company || '').localeCompare(b.company || '');
+                    });
+                    break;
+                    
+                case 'dateDesc': // 날짜 내림차순
+                    sortedData.sort((a, b) => {
+                        if (a.date !== b.date) {
+                            return a.date > b.date ? -1 : 1;
+                        }
+                        return (a.company || '').localeCompare(b.company || '');
+                    });
+                    break;
+                    
+                case 'company': // 거래처상호 기준
+                    sortedData.sort((a, b) => {
+                        const compResult = (a.company || '').localeCompare(b.company || '');
+                        if (compResult !== 0) {
+                            return compResult;
+                        }
+                        return a.date < b.date ? -1 : 1;
+                    });
+                    break;
+            }
+            
+            renderDispatchList(sortedData);
+        }
 
         // 기간 데이터 불러오기
         async function fetchDispatchDataByRange() {
@@ -299,7 +395,12 @@
                     .get();
                 console.log("기간 데이터 가져오기 성공:", snapshot.docs.length, "개 문서");
                 const dispatchData = snapshot.docs.map(doc => doc.data());
-                renderDispatchList(dispatchData);
+                
+                // 전역 변수에 데이터 저장
+                window._dispatchData = dispatchData;
+                
+                // 정렬 및 렌더링
+                sortAndRenderDispatchData(dispatchData);
                 restoreCheckboxState();
             } catch (error) {
                 console.error("기간 데이터 가져오기 실패:", error);
@@ -363,7 +464,6 @@
             // 상세 데이터 전역 저장
             window._dispatchData = dispatchData;
             updateMultiCopyBtn();
-            restoreCheckboxState();
         }
 
         // 복사 기능 (5개 항목 줄바꿈)
