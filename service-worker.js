@@ -1,9 +1,9 @@
-const CACHE_NAME = 'dispatch-app-v1';
+const CACHE_NAME = 'dispatch-app-v1.0.1';
 const urlsToCache = [
-  '/dispatch-app/dispatch.html',
-  '/dispatch-app/manifest.json',
-  '/dispatch-app/icon-192x192.png',
-  '/dispatch-app/icon-512x512.png',
+  '/sw-app/dispatch.html',
+  '/sw-app/manifest.json',
+  '/sw-app/icon-192x192.png',
+  '/sw-app/icon-512x512.png',
   'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js',
   'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js'
@@ -13,6 +13,22 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting()) // 즉시 활성화
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim()) // 모든 클라이언트 제어
   );
 });
 
