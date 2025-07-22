@@ -1,21 +1,26 @@
-// 항상 네트워크에서 최신 파일을 불러오고, 오프라인일 때만 캐시 사용
+// 항상 네트워크에서만 최신 파일을 가져옴 (캐시 사용 안 함)
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    fetch(event.request)
-      .catch(() => caches.match(event.request)) // 네트워크가 안될 때만 캐시 사용
-  );
+  event.respondWith(fetch(event.request));
 });
 
-// install 이벤트에서 즉시 활성화
+// 설치 시 즉시 활성화
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// activate 시 기존 캐시 모두 삭제 후 클라이언트 제어
+// 활성화 시 모든 캐시 삭제 + 클라이언트 강제 새로고침
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
-    }).then(() => self.clients.claim())
+    (async () => {
+      // 모든 캐시 삭제
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+
+      // 모든 클라이언트를 제어하고 강제로 새로고침
+      const clientsList = await self.clients.matchAll({ type: 'window' });
+      clientsList.forEach(client => client.navigate(client.url));
+
+      await self.clients.claim();
+    })()
   );
 }); 
