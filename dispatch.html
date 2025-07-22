@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#43a047">
     <meta name="description" content="배차 관리 및 조회 앱">
-    <link rel="manifest" href="/dispatch-app/manifest.json">
-    <link rel="apple-touch-icon" href="/dispatch-app/icon-192x192.png">
+    <link rel="manifest" href="/sw-app/manifest.json">
+    <link rel="apple-touch-icon" href="/sw-app/icon-192x192.png">
     <!-- Firebase SDK 추가 -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -56,25 +56,6 @@
         }
         .search-btn:hover {
             background: #388e3c;
-        }
-        .sort-options {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-            justify-content: center;
-        }
-        .sort-btn {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #f0f0f0;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .sort-btn.active {
-            background: #43a047;
-            color: white;
-            border-color: #43a047;
         }
         .dispatch-list {
             margin-top: 10px;
@@ -228,10 +209,32 @@
         .multi-copy-btn:hover {
             background: #1976D2;
         }
+        .sort-btn {
+            background: #f5f5f5;
+            border: 1px solid #43a047;
+            color: #222;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .sort-btn.active {
+            background: #43a047;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- 로그인 박스 -->
+    <div id="loginBox" style="max-width:400px; margin:60px auto 0 auto; padding:30px 20px; background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.08); display:none;">
+        <h2 style="text-align:center; color:#388e3c; margin-bottom:18px;">로그인</h2>
+        <input type="email" id="email" placeholder="이메일" style="width:100%;height:44px;font-size:16px;margin-bottom:10px;padding:8px 10px;border:1px solid #ddd;border-radius:4px;">
+        <input type="password" id="password" placeholder="비밀번호" style="width:100%;height:44px;font-size:16px;margin-bottom:16px;padding:8px 10px;border:1px solid #ddd;border-radius:4px;">
+        <button onclick="login()" style="width:100%;height:44px;font-size:18px;font-weight:bold;background:#43a047;color:#fff;border:none;border-radius:6px;">로그인</button>
+    </div>
+    <div class="container" id="mainBox" style="display:none;">
         <h1>배차 목록</h1>
         <div class="date-row">
             <input type="date" id="startDate" class="date-picker" value="">
@@ -239,13 +242,10 @@
             <input type="date" id="endDate" class="date-picker" value="">
         </div>
         <button id="searchBtn" class="search-btn">조회</button>
-        
-        <div class="sort-options">
-            <button class="sort-btn active" data-sort="dateAsc">날짜 오름차순</button>
-            <button class="sort-btn" data-sort="dateDesc">날짜 내림차순</button>
-            <button class="sort-btn" data-sort="company">거래처상호</button>
+        <div style="display:flex; justify-content:center; gap:8px; margin-bottom:10px;">
+            <button id="sortDescBtn" class="sort-btn active">날짜 내림차순</button>
+            <button id="sortAscBtn" class="sort-btn">날짜 오름차순</button>
         </div>
-        
         <div id="dispatchList"></div>
         <div id="modalBg" style="display:none;"></div>
         <button id="multiCopyBtn" class="multi-copy-btn" style="display:none;">다중 복사</button>
@@ -281,98 +281,80 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 현재 정렬 방식 저장
-        let currentSortMethod = 'dateAsc';
-
         // 오늘 날짜 기본값
         function getTodayStr() {
             const today = new Date();
             return today.toISOString().slice(0, 10);
         }
 
-        // 날짜 입력란 및 체크박스 상태 복원
-        function restoreState() {
-            // 날짜 복원
-            const savedStart = localStorage.getItem('dispatch_startDate');
-            const savedEnd = localStorage.getItem('dispatch_endDate');
-            document.getElementById('startDate').value = savedStart || getTodayStr();
-            document.getElementById('endDate').value = savedEnd || getTodayStr();
+        // 3일 전 날짜 계산
+        function getThreeDaysAgoStr() {
+            const threeDaysAgo = new Date();
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+            return threeDaysAgo.toISOString().slice(0, 10);
+        }
+
+        // 날짜 입력란 설정 및 제한
+        function setupDatePickers() {
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
             
-            // 정렬 방식 복원
-            const savedSortMethod = localStorage.getItem('dispatch_sortMethod') || 'dateAsc';
-            currentSortMethod = savedSortMethod;
+            // 최소/최대 날짜 설정
+            const threeDaysAgo = getThreeDaysAgoStr();
+            const today = getTodayStr();
             
-            // 정렬 버튼 상태 업데이트
-            document.querySelectorAll('.sort-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.sort === currentSortMethod);
+            startDateInput.min = threeDaysAgo;
+            startDateInput.max = today;
+            endDateInput.min = threeDaysAgo;
+            endDateInput.max = today;
+            
+            // 기본값을 오늘로 설정
+            startDateInput.value = today;
+            endDateInput.value = today;
+            
+            // 날짜 변경 시 유효성 검사 및 localStorage 저장
+            startDateInput.addEventListener('change', function(e) {
+                const selectedDate = e.target.value;
+                if (selectedDate > endDateInput.value) {
+                    endDateInput.value = selectedDate;
+                }
+                localStorage.setItem('dispatch_startDate', selectedDate);
+            });
+            
+            endDateInput.addEventListener('change', function(e) {
+                const selectedDate = e.target.value;
+                if (selectedDate < startDateInput.value) {
+                    startDateInput.value = selectedDate;
+                }
+                localStorage.setItem('dispatch_endDate', selectedDate);
             });
         }
-        restoreState();
+        
+        // 페이지 로드 시 날짜 설정
+        setupDatePickers();
 
-        // 날짜 변경 시 localStorage에 저장
-        document.getElementById('startDate').addEventListener('change', function(e) {
-            localStorage.setItem('dispatch_startDate', e.target.value);
-        });
-        document.getElementById('endDate').addEventListener('change', function(e) {
-            localStorage.setItem('dispatch_endDate', e.target.value);
-        });
+        // 정렬 상태 전역 변수
+        let currentSort = 'desc'; // 기본값: 내림차순(최신순)
 
-        // 정렬 방식 버튼 이벤트
-        document.querySelectorAll('.sort-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                // 현재 버튼만 활성화
-                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
+        // 정렬 함수
+        function sortDispatchData(data) {
+            return data.slice().sort((a, b) => {
+                if (!a.date || !b.date) return 0;
                 
-                // 정렬 방식 업데이트
-                currentSortMethod = this.dataset.sort;
-                localStorage.setItem('dispatch_sortMethod', currentSortMethod);
+                // 날짜 비교
+                const dateCompare = currentSort === 'desc' 
+                    ? b.date.localeCompare(a.date) 
+                    : a.date.localeCompare(b.date);
                 
-                // 이미 데이터가 있으면 재정렬하여 표시
-                if (window._dispatchData && window._dispatchData.length > 0) {
-                    sortAndRenderDispatchData(window._dispatchData);
+                // 날짜가 같은 경우 거래처상호로 정렬
+                if (dateCompare === 0) {
+                    const companyA = (a.company || '').toLowerCase();
+                    const companyB = (b.company || '').toLowerCase();
+                    return companyA.localeCompare(companyB);
                 }
+                
+                return dateCompare;
             });
-        });
-
-        // 데이터 정렬 함수
-        function sortAndRenderDispatchData(data) {
-            if (!data || !data.length) return;
-            
-            const sortedData = [...data]; // 원본 데이터 복사
-            
-            // 정렬 방식에 따라 정렬
-            switch (currentSortMethod) {
-                case 'dateAsc': // 날짜 오름차순 (기본값)
-                    sortedData.sort((a, b) => {
-                        if (a.date !== b.date) {
-                            return a.date < b.date ? -1 : 1;
-                        }
-                        return (a.company || '').localeCompare(b.company || '');
-                    });
-                    break;
-                    
-                case 'dateDesc': // 날짜 내림차순
-                    sortedData.sort((a, b) => {
-                        if (a.date !== b.date) {
-                            return a.date > b.date ? -1 : 1;
-                        }
-                        return (a.company || '').localeCompare(b.company || '');
-                    });
-                    break;
-                    
-                case 'company': // 거래처상호 기준
-                    sortedData.sort((a, b) => {
-                        const compResult = (a.company || '').localeCompare(b.company || '');
-                        if (compResult !== 0) {
-                            return compResult;
-                        }
-                        return a.date < b.date ? -1 : 1;
-                    });
-                    break;
-            }
-            
-            renderDispatchList(sortedData);
         }
 
         // 기간 데이터 불러오기
@@ -389,18 +371,25 @@
             }
             try {
                 console.log("기간 조회:", startDate, '~', endDate);
-                const snapshot = await db.collection("배차일보")
+                // 1. dispatchReports 컬렉션에서 기간 내 문서 조회
+                const reportSnapshot = await db.collection("dispatchReports")
                     .where("date", ">=", startDate)
                     .where("date", "<=", endDate)
                     .get();
-                console.log("기간 데이터 가져오기 성공:", snapshot.docs.length, "개 문서");
-                const dispatchData = snapshot.docs.map(doc => doc.data());
-                
-                // 전역 변수에 데이터 저장
-                window._dispatchData = dispatchData;
-                
-                // 정렬 및 렌더링
-                sortAndRenderDispatchData(dispatchData);
+
+                let dispatchData = [];
+                // 2. 각 문서의 rows 서브컬렉션에서 데이터 가져오기 (date 포함)
+                for (const doc of reportSnapshot.docs) {
+                    const reportDate = doc.data().date;
+                    const rowsSnapshot = await doc.ref.collection("rows").get();
+                    rowsSnapshot.forEach(rowDoc => {
+                        const rowData = rowDoc.data();
+                        rowData.date = reportDate; // row에 날짜 추가
+                        dispatchData.push(rowData);
+                    });
+                }
+                console.log("기간 데이터 가져오기 성공:", dispatchData.length, "개 문서");
+                renderDispatchList(dispatchData);
                 restoreCheckboxState();
             } catch (error) {
                 console.error("기간 데이터 가져오기 실패:", error);
@@ -430,15 +419,23 @@
             updateMultiCopyBtn();
         }
 
-        // 배차 목록 렌더링 (모바일 가독성 리스트형)
+        // 배차 목록 렌더링 (정렬 반영)
         function renderDispatchList(dispatchData) {
             const list = document.getElementById('dispatchList');
-            if (dispatchData.length === 0) {
+            // company는 존재하지만 vehicleNumber와 route가 모두 없는 항목은 제외
+            const filteredData = dispatchData.filter(item => {
+                if (!item.company) return true; // company가 없으면 그냥 표시
+                // company가 있는데 차량번호와 운송구간이 모두 없으면 제외
+                return !!(item.vehicleNumber || item.route);
+            });
+            if (filteredData.length === 0) {
                 list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">데이터가 없습니다.</div>';
                 return;
             }
+            // 정렬 적용
+            const sortedData = sortDispatchData(filteredData);
             let html = `<div class="dispatch-list">`;
-            html += dispatchData.map((item, idx) => `
+            html += sortedData.map((item, idx) => `
                 <div class="dispatch-list-row" onclick="showDetailModal(${idx})">
                     <div class="dispatch-list-row-checkbox" onclick="event.stopPropagation();">
                         <input type="checkbox" id="check_${idx}" onchange="updateMultiCopyBtn(); saveCheckboxState();">
@@ -461,9 +458,10 @@
             html += '</div>';
             list.innerHTML = html;
 
-            // 상세 데이터 전역 저장
-            window._dispatchData = dispatchData;
+            // 상세 데이터 전역 저장 (정렬된 데이터로)
+            window._dispatchData = sortedData;
             updateMultiCopyBtn();
+            restoreCheckboxState();
         }
 
         // 복사 기능 (5개 항목 줄바꿈)
@@ -538,6 +536,48 @@
         function closeModal() {
             document.getElementById('modalBg').style.display = 'none';
         }
+
+        // 로그인 함수
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            firebase.auth().signInWithEmailAndPassword(email, password)
+                .then(userCredential => {
+                    alert('로그인 성공!');
+                    document.getElementById('loginBox').style.display = 'none';
+                    document.getElementById('mainBox').style.display = '';
+                    fetchDispatchDataByRange();
+                })
+                .catch(error => {
+                    alert('로그인 실패: ' + error.message);
+                });
+        }
+
+        // 로그인 상태 체크
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('loginBox').style.display = 'none';
+                document.getElementById('mainBox').style.display = '';
+                fetchDispatchDataByRange();
+            } else {
+                document.getElementById('loginBox').style.display = '';
+                document.getElementById('mainBox').style.display = 'none';
+            }
+        });
+
+        // 정렬 버튼 이벤트
+        document.getElementById('sortDescBtn').addEventListener('click', function() {
+            currentSort = 'desc';
+            document.getElementById('sortDescBtn').classList.add('active');
+            document.getElementById('sortAscBtn').classList.remove('active');
+            if (window._dispatchData) renderDispatchList(window._dispatchData);
+        });
+        document.getElementById('sortAscBtn').addEventListener('click', function() {
+            currentSort = 'asc';
+            document.getElementById('sortAscBtn').classList.add('active');
+            document.getElementById('sortDescBtn').classList.remove('active');
+            if (window._dispatchData) renderDispatchList(window._dispatchData);
+        });
     </script>
 </body>
 </html>
