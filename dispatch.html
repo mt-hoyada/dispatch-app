@@ -372,47 +372,40 @@
 
         // 기간 데이터 불러오기
         async function fetchDispatchDataByRange() {
-            let startDate = document.getElementById('startDate').value.trim();
-            let endDate = document.getElementById('endDate').value.trim();
-            if (!startDate || !endDate) {
-                alert('시작일과 종료일을 모두 선택하세요.');
-                return;
-            }
-            if (startDate > endDate) {
-                alert('시작일이 종료일보다 늦을 수 없습니다.');
-                return;
-            }
-            
-            // 3일 전 날짜 제한 확인
+            // 오늘, 3일전 날짜 계산
+            const today = getTodayStr();
             const threeDaysAgo = getThreeDaysAgoStr();
-            if (startDate < threeDaysAgo || endDate < threeDaysAgo) {
-                alert('3일 전 데이터까지만 조회가 가능합니다.');
-                return;
+
+            // 사용자가 넓은 범위를 선택했는지 확인
+            let userStart = document.getElementById('startDate').value.trim();
+            let userEnd = document.getElementById('endDate').value.trim();
+            if (userStart < threeDaysAgo || userEnd > today) {
+                alert('3일 전부터 오늘까지만 조회할 수 있습니다. 오늘~3일 전 데이터만 보여집니다.');
             }
+
+            // 쿼리 범위를 무조건 3일전~오늘로 고정
+            const startDate = threeDaysAgo;
+            const endDate = today;
+
             try {
-                console.log("기간 조회:", startDate, '~', endDate);
-                // 1. dispatchReports 컬렉션에서 기간 내 문서 조회
                 const reportSnapshot = await db.collection("dispatchReports")
                     .where("date", ">=", startDate)
                     .where("date", "<=", endDate)
                     .get();
 
                 let dispatchData = [];
-                // 2. 각 문서의 rows 서브컬렉션에서 데이터 가져오기 (date 포함)
                 for (const doc of reportSnapshot.docs) {
                     const reportDate = doc.data().date;
                     const rowsSnapshot = await doc.ref.collection("rows").get();
                     rowsSnapshot.forEach(rowDoc => {
                         const rowData = rowDoc.data();
-                        rowData.date = reportDate; // row에 날짜 추가
+                        rowData.date = reportDate;
                         dispatchData.push(rowData);
                     });
                 }
-                console.log("기간 데이터 가져오기 성공:", dispatchData.length, "개 문서");
                 renderDispatchList(dispatchData);
                 restoreCheckboxState();
             } catch (error) {
-                console.error("기간 데이터 가져오기 실패:", error);
                 alert("데이터를 가져오는데 실패했습니다: " + error.message);
             }
         }
@@ -442,8 +435,12 @@
         // 배차 목록 렌더링 (정렬 반영)
         function renderDispatchList(dispatchData) {
             const list = document.getElementById('dispatchList');
-            // company는 존재하지만 vehicleNumber와 route가 모두 없는 항목은 제외
+            const today = getTodayStr();
+            const threeDaysAgo = getThreeDaysAgoStr();
+            // 오늘~3일전 데이터만 필터링
             const filteredData = dispatchData.filter(item => {
+                return item.date >= threeDaysAgo && item.date <= today;
+            }).filter(item => {
                 if (!item.company) return true; // company가 없으면 그냥 표시
                 // company가 있는데 차량번호와 운송구간이 모두 없으면 제외
                 return !!(item.vehicleNumber || item.route);
