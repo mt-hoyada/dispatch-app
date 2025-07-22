@@ -28,7 +28,15 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    }).then(() => self.clients.claim()) // 모든 클라이언트 제어
+    }).then(() => {
+      self.clients.claim();
+      // 모든 클라이언트에 새 버전 알림
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ type: 'NEW_VERSION_AVAILABLE' });
+        });
+      });
+    })
   );
 });
 
