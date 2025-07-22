@@ -369,6 +369,13 @@
                 alert('시작일이 종료일보다 늦을 수 없습니다.');
                 return;
             }
+            
+            // 3일 전 날짜 제한 확인
+            const threeDaysAgo = getThreeDaysAgoStr();
+            if (startDate < threeDaysAgo || endDate < threeDaysAgo) {
+                alert('3일 전 데이터까지만 조회가 가능합니다.');
+                return;
+            }
             try {
                 console.log("기간 조회:", startDate, '~', endDate);
                 // 1. dispatchReports 컬렉션에서 기간 내 문서 조회
